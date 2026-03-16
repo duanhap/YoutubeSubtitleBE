@@ -1,4 +1,5 @@
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import uuid
 import os
@@ -164,8 +165,16 @@ def background_worker(job_id: str, req: YouTubeRequest):
         jobs[job_id]["result"] = formatted_sections
         jobs[job_id]["source"] = source
         
-        # Lưu vào file để bền vững (Persistent)
+        # Lưu JSON để bền vững (Persistent)
         save_job_to_file(job_id, jobs[job_id])
+        
+        # Tạo file SRT
+        from core.subtitle_generator import SubtitleGenerator
+        srt_content = SubtitleGenerator.generate_srt_from_formatted(formatted_sections)
+        srt_path = UPLOAD_DIR / f"{job_id}.srt"
+        with open(srt_path, "w", encoding="utf-8") as f:
+            f.write(srt_content)
+        print(f"✅ Đã lưu file SRT: {srt_path}")
 
     except Exception as e:
         import traceback
@@ -210,6 +219,18 @@ async def get_progress(job_id: str):
         "message": job.get("message"),
         "data": job.get("result") if job["status"] == "completed" else []
     }
+
+@app.get("/download/{job_id}")
+async def download_srt(job_id: str):
+    srt_path = UPLOAD_DIR / f"{job_id}.srt"
+    if not srt_path.exists():
+        raise HTTPException(status_code=404, detail="SRT file not found")
+    
+    return FileResponse(
+        path=srt_path,
+        filename=f"{job_id}.srt",
+        media_type='application/x-subrip'
+    )
 
 if __name__ == "__main__":
     import uvicorn

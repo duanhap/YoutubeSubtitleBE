@@ -129,6 +129,28 @@ ngrok-skip-browser-warning: true
 
 ---
 
+### 3. Tải xuống file SRT
+
+Tải về file phụ đề định dạng `.srt` sau khi job đã hoàn thành.
+
+**Endpoint:** `GET /download/{job_id}`
+
+**Ví dụ:** `GET /download/5fbbddd7-19f3-45ab-a52a-10730ac65746`
+
+**Headers:**
+```
+ngrok-skip-browser-warning: true
+```
+
+**Response:** File download `.srt`.
+
+| Mã lỗi | Ý nghĩa |
+|---|---|
+| `200` | Thành công, trả về file |
+| `404` | Không tìm thấy file (Job chưa xong hoặc ID sai) |
+
+---
+
 ## Cấu trúc dữ liệu `data[]`
 
 Mỗi phần tử trong mảng `data` đại diện cho **một đoạn phụ đề**:
