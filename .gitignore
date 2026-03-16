@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+uploads/
+*.m4a
+*.mp3
+*.wav
+.vscode/
+.idea/

@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pydantic
+python-dotenv
+faster-whisper
+youtube-transcript-api
+yt-dlp
+deep-translator
+eng-to-ipa
+pykakasi
+pypinyin

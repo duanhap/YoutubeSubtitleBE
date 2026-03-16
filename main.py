@@ -1,0 +1,190 @@
+from fastapi import FastAPI, BackgroundTasks
+from pydantic import BaseModel
+import uuid
+import os
+from pathlib import Path
+from typing import List, Dict, Any, Optional
+from dotenv import load_dotenv
+from faster_whisper import WhisperModel
+
+from core.config import UPLOAD_DIR, MODEL_CONFIG
+from core.youtube_service import YouTubeService
+from core.translation_service import translation_service
+from core.subtitle_generator import SubtitleGenerator
+from core.utils import get_video_id, safe_remove, format_timestamp, clean_subtitle_text
+
+# Load env từ thư mục cha
+load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env")
+
+app = FastAPI(title="MIRA BE V2 - Job System")
+
+# Lưu trữ trạng thái công việc
+jobs: Dict[str, Dict[str, Any]] = {}
+
+# Khởi tạo YT Service
+yt_service = YouTubeService(
+    translation_service,
+    proxy_username=os.getenv("PROXY_USERNAME"),
+    proxy_password=os.getenv("PROXY_PASSWORD"),
+    proxy_ip=os.getenv("PROXY_IP")
+)
+
+# Khởi tạo Faster Whisper
+model = WhisperModel(
+    MODEL_CONFIG["model_size"],
+    device=MODEL_CONFIG["device"],
+    compute_type=MODEL_CONFIG["compute_type"]
+)
+
+class YouTubeRequest(BaseModel):
+    sourceurl: str
+    termlanguagecode: str = "ja"
+    definitionlanguagecode: str = "vi"
+
+def background_worker(job_id: str, req: YouTubeRequest):
+    """Hàm chạy ngầm xử lý video"""
+    try:
+        jobs[job_id]["status"] = "processing"
+        jobs[job_id]["progress"] = 5
+        
+        video_id = get_video_id(req.sourceurl)
+        if not video_id:
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["message"] = "Invalid YouTube URL"
+            return
+
+        segments_data: List[Dict[str, Any]] = []
+        source = "youtube_subs"
+
+        # 1. Thử lấy sub trực tiếp từ YouTube
+        source_subs, target_subs = yt_service.get_youtube_subtitles(video_id, lang_code=req.termlanguagecode, target_lang=req.definitionlanguagecode)
+        
+        def update_progress(p):
+            # Tiến trình dịch chiếm từ 20% đến 90%
+            jobs[job_id]["progress"] = 20 + int(p * 0.7)
+
+        if (source_subs and len(source_subs) > 0) or (target_subs and len(target_subs) > 0):
+            jobs[job_id]["progress"] = 15
+            segments_data = yt_service.process_youtube_subtitles(
+                source_subs, target_subs, 
+                lang_code=req.termlanguagecode,
+                target_lang=req.definitionlanguagecode,
+                progress_callback=update_progress
+            )
+        
+        # 2. Thu fetch direct nếu bước 1 fail
+        if not segments_data:
+            jobs[job_id]["progress"] = 15
+            direct_subs = yt_service.fetch_direct_subtitles(video_id, languages=[req.termlanguagecode, req.definitionlanguagecode])
+            if direct_subs:
+                source = "youtube_direct"
+                total = len(direct_subs)
+                for i, s in enumerate(direct_subs):
+                    text = clean_subtitle_text(s['text'])
+                    if not text: continue
+                    vietsub = translation_service.translate(text, source=req.termlanguagecode, target=req.definitionlanguagecode)
+                    vietsub = clean_subtitle_text(vietsub)
+                    if not vietsub: continue
+                    
+                    segments_data.append({
+                        "start": s['start'],
+                        "end": s['start'] + s.get('duration', 2.0),
+                        "kanji": text,
+                        "pronunciation": translation_service.get_pronunciation(text, lang_code=req.termlanguagecode),
+                        "vietsub": vietsub
+                    })
+                    jobs[job_id]["progress"] = 20 + int(((i+1)/total) * 70)
+
+        # 3. Whisper Fallback
+        if not segments_data:
+            source = "whisper"
+            jobs[job_id]["progress"] = 20
+            audio_path = UPLOAD_DIR / f"{job_id}.m4a"
+            if yt_service.download_youtube_audio(req.sourceurl, audio_path):
+                jobs[job_id]["progress"] = 50
+                try:
+                    whisper_segments, _ = model.transcribe(str(audio_path), language=req.termlanguagecode)
+                    # Whisper trả về generator, ta chuyển sang list để tính toán
+                    seg_list = list(whisper_segments)
+                    total = len(seg_list)
+                    for i, w_seg in enumerate(seg_list):
+                        text = clean_subtitle_text(w_seg.text)
+                        if not text: continue
+                        vietsub = translation_service.translate(text, source=req.termlanguagecode, target=req.definitionlanguagecode)
+                        vietsub = clean_subtitle_text(vietsub)
+                        if not vietsub: continue
+
+                        segments_data.append({
+                            "start": w_seg.start,
+                            "end": w_seg.end,
+                            "kanji": text,
+                            "pronunciation": translation_service.get_pronunciation(text, lang_code=req.termlanguagecode),
+                            "vietsub": vietsub
+                        })
+                        jobs[job_id]["progress"] = 50 + int(((i+1)/total) * 45)
+                finally:
+                    safe_remove(audio_path)
+
+        if not segments_data:
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["message"] = "No subtitles could be generated"
+            return
+
+        # 4. Format kết quả cuối cùng
+        formatted_sections = []
+        for idx, seg in enumerate(segments_data, 1):
+            start_val = float(seg.get("start", 0.0))
+            end_val = float(seg.get("end", start_val + 2.0))
+            formatted_sections.append({
+                "stt": idx,
+                "starttime": format_timestamp(start_val),
+                "endtime": format_timestamp(end_val),
+                "content": seg.get("kanji", ""),
+                "pronunciation": seg.get("pronunciation", ""),
+                "translation": seg.get("vietsub", "")
+            })
+
+        jobs[job_id]["status"] = "completed"
+        jobs[job_id]["progress"] = 100
+        jobs[job_id]["result"] = formatted_sections
+        jobs[job_id]["source"] = source
+
+    except Exception as e:
+        import traceback
+        print(f"❌ Job Error: {traceback.format_exc()}")
+        jobs[job_id]["status"] = "failed"
+        jobs[job_id]["message"] = str(e)
+
+@app.post("/youtube")
+async def process_youtube(req: YouTubeRequest, background_tasks: BackgroundTasks):
+    job_id = str(uuid.uuid4())
+    jobs[job_id] = {
+        "status": "pending",
+        "progress": 0,
+        "result": None,
+        "message": None
+    }
+    background_tasks.add_task(background_worker, job_id, req)
+    return {
+        "success": True,
+        "message": "Job started",
+        "data": {"job_id": job_id}
+    }
+
+@app.get("/progress/{job_id}")
+async def get_progress(job_id: str):
+    if job_id not in jobs:
+        return {"success": False, "message": "Job not found"}
+    
+    job = jobs[job_id]
+    return {
+        "success": True,
+        "status": job["status"],
+        "progress": job["progress"],
+        "message": job["message"],
+        "data": job["result"] if job["status"] == "completed" else []
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8002)
