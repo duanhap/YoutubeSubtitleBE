@@ -18,8 +18,23 @@ load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env")
 
 app = FastAPI(title="MIRA BE V2 - Job System")
 
-# Lưu trữ trạng thái công việc
+# Lưu trữ trạng thái công việc (Cache trong RAM)
 jobs: Dict[str, Dict[str, Any]] = {}
+
+import json
+def save_job_to_file(job_id: str, data: dict):
+    """Lưu kết quả job vào file JSON"""
+    file_path = UPLOAD_DIR / f"{job_id}.json"
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+def load_job_from_file(job_id: str) -> Optional[dict]:
+    """Đọc kết quả job từ file JSON"""
+    file_path = UPLOAD_DIR / f"{job_id}.json"
+    if file_path.exists():
+        with open(file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return None
 
 # Khởi tạo YT Service
 yt_service = YouTubeService(
@@ -148,6 +163,9 @@ def background_worker(job_id: str, req: YouTubeRequest):
         jobs[job_id]["progress"] = 100
         jobs[job_id]["result"] = formatted_sections
         jobs[job_id]["source"] = source
+        
+        # Lưu vào file để bền vững (Persistent)
+        save_job_to_file(job_id, jobs[job_id])
 
     except Exception as e:
         import traceback
@@ -173,16 +191,24 @@ async def process_youtube(req: YouTubeRequest, background_tasks: BackgroundTasks
 
 @app.get("/progress/{job_id}")
 async def get_progress(job_id: str):
-    if job_id not in jobs:
-        return {"success": False, "message": "Job not found"}
+    # 1. Kiểm tra trong RAM trước
+    if job_id in jobs:
+        job = jobs[job_id]
+    else:
+        # 2. Nếu không có trong RAM (do restart), thử tìm trong file
+        job = load_job_from_file(job_id)
+        if job:
+            # Khôi phục vào RAM để lần sau lấy nhanh hơn
+            jobs[job_id] = job
+        else:
+            return {"success": False, "message": "Job not found"}
     
-    job = jobs[job_id]
     return {
         "success": True,
         "status": job["status"],
-        "progress": job["progress"],
-        "message": job["message"],
-        "data": job["result"] if job["status"] == "completed" else []
+        "progress": job.get("progress", 0),
+        "message": job.get("message"),
+        "data": job.get("result") if job["status"] == "completed" else []
     }
 
 if __name__ == "__main__":
