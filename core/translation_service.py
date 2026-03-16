@@ -8,7 +8,6 @@ from typing import List
 class TranslationService:
     def __init__(self):
         self.kks = pykakasi.kakasi()
-        self.translators = {} # cache translators for different lang pairs
     
     def to_hiragana(self, text: str) -> str:
         """Chuyển text sang Hiragana (Tiếng Nhật)"""
@@ -59,11 +58,9 @@ class TranslationService:
         if source == target:
             return text
             
-        key = f"{source}_{target}"
-        if key not in self.translators:
-            self.translators[key] = GoogleTranslator(source=source, target=target)
         try:
-            return self.translators[key].translate(text)
+            translator = GoogleTranslator(source=source, target=target)
+            return translator.translate(text)
         except Exception as e:
             print(f"Translation error: {e}")
             return text
