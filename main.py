@@ -76,6 +76,8 @@ def background_worker(job_id: str, req: YouTubeRequest):
         source_subs, target_subs = yt_service.get_youtube_subtitles(video_id, lang_code=req.termlanguagecode, target_lang=req.definitionlanguagecode)
         
         def update_progress(p):
+            if jobs.get(job_id, {}).get("status") == "cancelled":
+                raise Exception("Job cancelled by user")
             # Tiến trình dịch chiếm từ 20% đến 90%
             jobs[job_id]["progress"] = 20 + int(p * 0.7)
 
@@ -96,6 +98,9 @@ def background_worker(job_id: str, req: YouTubeRequest):
                 source = "youtube_direct"
                 total = len(direct_subs)
                 for i, s in enumerate(direct_subs):
+                    if jobs.get(job_id, {}).get("status") == "cancelled":
+                        raise Exception("Job cancelled by user")
+                    
                     text = clean_subtitle_text(s['text'])
                     if not text: continue
                     vietsub = translation_service.translate(text, source=req.termlanguagecode, target=req.definitionlanguagecode)
@@ -124,6 +129,9 @@ def background_worker(job_id: str, req: YouTubeRequest):
                     seg_list = list(whisper_segments)
                     total = len(seg_list)
                     for i, w_seg in enumerate(seg_list):
+                        if jobs.get(job_id, {}).get("status") == "cancelled":
+                            raise Exception("Job cancelled by user")
+                            
                         text = clean_subtitle_text(w_seg.text)
                         if not text: continue
                         vietsub = translation_service.translate(text, source=req.termlanguagecode, target=req.definitionlanguagecode)
@@ -179,8 +187,15 @@ def background_worker(job_id: str, req: YouTubeRequest):
     except Exception as e:
         import traceback
         print(f"❌ Job Error: {traceback.format_exc()}")
+        
+        # Nếu đã bị hủy thì không ghi đè thành failed
+        if jobs.get(job_id, {}).get("status") == "cancelled":
+            save_job_to_file(job_id, jobs[job_id])
+            return
+            
         jobs[job_id]["status"] = "failed"
         jobs[job_id]["message"] = str(e)
+        save_job_to_file(job_id, jobs[job_id])
 
 @app.post("/youtube")
 async def process_youtube(req: YouTubeRequest, background_tasks: BackgroundTasks):
@@ -195,7 +210,10 @@ async def process_youtube(req: YouTubeRequest, background_tasks: BackgroundTasks
     return {
         "success": True,
         "message": "Job started",
-        "data": {"job_id": job_id}
+        "data": {
+            "job_id": job_id,
+            "video_url": req.sourceurl
+        }
     }
 
 @app.get("/progress/{job_id}")
@@ -231,6 +249,25 @@ async def download_srt(job_id: str):
         filename=f"{job_id}.srt",
         media_type='application/x-subrip'
     )
+
+@app.post("/cancel/{job_id}")
+async def cancel_job(job_id: str):
+    # Tìm trong cả RAM và File
+    if job_id not in jobs:
+        job = load_job_from_file(job_id)
+        if job:
+            jobs[job_id] = job
+        else:
+            return {"success": False, "message": "Job not found"}
+            
+    status = jobs[job_id]["status"]
+    if status in ["completed", "failed", "cancelled"]:
+        return {"success": False, "message": f"Job is already {status}"}
+        
+    jobs[job_id]["status"] = "cancelled"
+    jobs[job_id]["message"] = "Job cancelled by user"
+    
+    return {"success": True, "message": "Job cancellation requested"}
 
 if __name__ == "__main__":
     import uvicorn
