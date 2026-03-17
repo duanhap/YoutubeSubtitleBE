@@ -57,7 +57,8 @@ ngrok-skip-browser-warning: true
     "success": true,
     "message": "Job started",
     "data": {
-        "job_id": "5fbbddd7-19f3-45ab-a52a-10730ac65746"
+        "job_id": "5fbbddd7-19f3-45ab-a52a-10730ac65746",
+        "video_url": "https://www.youtube.com/watch?v=VIDEO_ID"
     }
 }
 ```
@@ -95,6 +96,7 @@ ngrok-skip-browser-warning: true
     "status": "completed",
     "progress": 100,
     "message": null,
+    "video_url": "/video/5fbbddd7-19f3-45ab-a52a-10730ac65746",
     "data": [
         {
             "stt": 1,
@@ -103,16 +105,19 @@ ngrok-skip-browser-warning: true
             "content": "Hello everyone",
             "pronunciation": "həˈloʊ ˈɛvrɪˌwʌn",
             "translation": "Xin chào mọi người"
-        },
-        {
-            "stt": 2,
-            "starttime": "00:00:03,500",
-            "endtime": "00:00:07,200",
-            "content": "Welcome to our channel",
-            "pronunciation": "ˈwɛlkəm tɪ ˈaʊər ˈtʃænəl",
-            "translation": "Chào mừng đến với kênh của chúng tôi"
         }
     ]
+}
+```
+
+**Response - Đang xử lý (video chưa sẵn):**
+```json
+{
+    "success": true,
+    "status": "completed",
+    "progress": 100,
+    "video_url": null,
+    "data": [ ... ]
 }
 ```
 
@@ -174,6 +179,38 @@ ngrok-skip-browser-warning: true
 
 ---
 
+### 5. Stream Video (ExoPlayer)
+
+Server tự động tải video mp4 về sau khi phụ đề hoàn thành. Dùng endpoint này để stream trực tiếp vào ExoPlayer.
+
+**Endpoint:** `GET /video/{job_id}`
+
+**Ví dụ:** `GET /video/5fbbddd7-19f3-45ab-a52a-10730ac65746`
+
+**Headers:**
+```
+ngrok-skip-browser-warning: true
+```
+
+**Response:** Video mp4 stream.
+
+| Mã lỗi | Ý nghĩa |
+|---|---|
+| `200` | Thành công, trả về video |
+| `404` | Video chưa tải xong hoặc ID sai |
+
+**Dùng trong Android (Kotlin):**
+```kotlin
+val videoUrl = "https://simple-emu-vocal.ngrok-free.app/video/$jobId"
+val mediaItem = MediaItem.fromUri(videoUrl)
+val player = ExoPlayer.Builder(context).build()
+player.setMediaItem(mediaItem)
+player.prepare()
+player.play()
+```
+
+---
+
 ## Cấu trúc dữ liệu `data[]`
 
 Mỗi phần tử trong mảng `data` đại diện cho **một đoạn phụ đề**:
@@ -197,8 +234,9 @@ Mỗi phần tử trong mảng `data` đại diện cho **một đoạn phụ đ
 |---|---|
 | `pending` | Đã nhận yêu cầu, chờ xử lý |
 | `processing` | Đang xử lý |
-| `completed` | Hoàn thành, `data` đã có kết quả |
+| `completed` | Hoàn thành, `data` và `video_url` đã có kết quả |
 | `failed` | Thất bại, xem `message` để biết nguyên nhân |
+| `cancelled` | Đã bị hủy bởi Client |
 
 ---
 
