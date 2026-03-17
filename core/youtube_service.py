@@ -122,6 +122,33 @@ class YouTubeService:
             print(f"❌ Lỗi tải audio/yt-dlp: {e}")
             return False
 
+    def download_youtube_video(self, url: str, output_path: Path) -> bool:
+        """Tải video mp4 từ YouTube dùng yt-dlp"""
+        try:
+            print(f"🎬 Đang tải video từ YouTube: {url}")
+            command = [
+                "yt-dlp",
+                "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/mp4",
+                "--merge-output-format", "mp4",
+                "-o", str(output_path),
+                "--no-warnings",
+                "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            ]
+
+            if self.proxy_url:
+                command.extend(["--proxy", str(self.proxy_url)])
+
+            command.append(url)
+
+            result = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8', errors='replace')
+            if output_path.exists():
+                print(f"✅ Tải video thành công: {output_path}")
+                return True
+            return False
+        except Exception as e:
+            print(f"❌ Lỗi tải video/yt-dlp: {e}")
+            return False
+
     def process_youtube_subtitles(self, source_subs: Optional[List[Dict]], target_subs: Optional[List[Dict]], lang_code: str = 'ja', target_lang: str = 'vi', progress_callback=None) -> List[Dict[str, Any]]:
         """Xử lý phụ đề: Hỗ trợ linh hoạt ngôn ngữ gốc và đích"""
         result = []

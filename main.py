@@ -183,6 +183,18 @@ def background_worker(job_id: str, req: YouTubeRequest):
         with open(srt_path, "w", encoding="utf-8") as f:
             f.write(srt_content)
         print(f"✅ Đã lưu file SRT: {srt_path}")
+        
+        # Tải video mp4 về server
+        video_path = UPLOAD_DIR / f"{job_id}.mp4"
+        video_downloaded = yt_service.download_youtube_video(req.sourceurl, video_path)
+        if video_downloaded:
+            jobs[job_id]["video_url"] = f"/video/{job_id}"
+        else:
+            jobs[job_id]["video_url"] = None
+            print(f"⚠️ Không tải được video, bỏ qua.")
+        
+        # Cập nhật lại JSON với video_url
+        save_job_to_file(job_id, jobs[job_id])
 
     except Exception as e:
         import traceback
@@ -235,6 +247,7 @@ async def get_progress(job_id: str):
         "status": job["status"],
         "progress": job.get("progress", 0),
         "message": job.get("message"),
+        "video_url": job.get("video_url"),
         "data": job.get("result") if job["status"] == "completed" else []
     }
 
@@ -268,6 +281,19 @@ async def cancel_job(job_id: str):
     jobs[job_id]["message"] = "Job cancelled by user"
     
     return {"success": True, "message": "Job cancellation requested"}
+
+@app.get("/video/{job_id}")
+async def stream_video(job_id: str):
+    """Serve file video mp4 để ExoPlayer stream"""
+    video_path = UPLOAD_DIR / f"{job_id}.mp4"
+    if not video_path.exists():
+        raise HTTPException(status_code=404, detail="Video not found or not yet downloaded")
+    
+    return FileResponse(
+        path=video_path,
+        filename=f"{job_id}.mp4",
+        media_type="video/mp4"
+    )
 
 if __name__ == "__main__":
     import uvicorn
