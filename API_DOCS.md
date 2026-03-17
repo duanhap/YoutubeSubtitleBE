@@ -151,6 +151,29 @@ ngrok-skip-browser-warning: true
 
 ---
 
+### 4. Hủy (Cancel) Job đang xử lý
+
+Gửi yêu cầu hủy một tiến trình đang chạy. Việc này giúp Server dừng ngay các quá trình dịch hoặc tải model nặng.
+
+**Endpoint:** `POST /cancel/{job_id}`
+
+**Ví dụ:** `POST /cancel/5fbbddd7-19f3-45ab-a52a-10730ac65746`
+
+**Headers:**
+```
+ngrok-skip-browser-warning: true
+```
+
+**Response:**
+
+| success | message | Ý nghĩa |
+|---|---|---|
+| `true` | Job cancellation requested | Hủy thành công |
+| `false` | Job not found | Không tìm thấy Job |
+| `false` | Job is already `[status]` | Job đã chạy xong, đã lỗi hoặc đã bị hủy trước đó |
+
+---
+
 ## Cấu trúc dữ liệu `data[]`
 
 Mỗi phần tử trong mảng `data` đại diện cho **một đoạn phụ đề**:
