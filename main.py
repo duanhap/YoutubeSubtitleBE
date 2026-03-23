@@ -1,8 +1,10 @@
+import os
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uuid
-import os
+import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
@@ -18,6 +20,9 @@ from core.utils import get_video_id, safe_remove, format_timestamp, clean_subtit
 load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env")
 
 app = FastAPI(title="MIRA BE V2 - Job System")
+
+# Serve toàn bộ file trong uploads/ qua /static/<filename>
+app.mount("/static", StaticFiles(directory=str(UPLOAD_DIR)), name="static")
 
 # Lưu trữ trạng thái công việc (Cache trong RAM)
 jobs: Dict[str, Dict[str, Any]] = {}
@@ -184,14 +189,14 @@ def background_worker(job_id: str, req: YouTubeRequest):
             f.write(srt_content)
         print(f"✅ Đã lưu file SRT: {srt_path}")
         
-        # Tải video mp4 về server
-        video_path = UPLOAD_DIR / f"{job_id}.mp4"
-        video_downloaded = yt_service.download_youtube_video(req.sourceurl, video_path)
-        if video_downloaded:
-            jobs[job_id]["video_url"] = f"/video/{job_id}"
-        else:
-            jobs[job_id]["video_url"] = None
-            print(f"⚠️ Không tải được video, bỏ qua.")
+        # # Tải video mp4 về server
+        # video_path = UPLOAD_DIR / f"{job_id}.mp4"
+        # video_downloaded = yt_service.download_youtube_video(req.sourceurl, video_path)
+        # if video_downloaded:
+        #     jobs[job_id]["video_url"] = f"/video/{job_id}"
+        # else:
+        #     jobs[job_id]["video_url"] = None
+        #     print(f"⚠️ Không tải được video, bỏ qua.")
         
         # Cập nhật lại JSON với video_url
         save_job_to_file(job_id, jobs[job_id])

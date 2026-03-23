@@ -1,0 +1,136 @@
+﻿python : Traceback (most 
+recent call last):
+At line:1 char:1
++ python -c "import epitran; 
+epi = 
+epitran.Epitran('vie-Latn', 
+tones=Tr ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~
+    + CategoryInfo           
+   : NotSpecified: (Traceba  
+  ck (most recent call las   
+ t)::String) [], RemoteEx    
+ception
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
+  File "<string>", line 1, 
+in <module>
+  File "C:\Users\ADMIN\AppDat
+a\Local\Programs\Python\Pytho
+n312\Lib\site-packages\epitra
+n\_epitran.py", line 51, in 
+__init__
+    self.epi = 
+SimpleEpitran(code, **kwargs)
+               
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ADMIN\AppDat
+a\Local\Programs\Python\Pytho
+n312\Lib\site-packages\epitra
+n\simple.py", line 64, in 
+__init__
+    self.ft = 
+panphon.FeatureTable()
+              
+^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ADMIN\AppDat
+a\Local\Programs\Python\Pytho
+n312\Lib\site-packages\panpho
+n\featuretable.py", line 62, 
+in __init__
+    self.segments, 
+self.seg_dict, self.names = 
+self._read_bases(bases_fn, 
+self.weights)
+                             
+                  ^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ADMIN\AppDat
+a\Local\Programs\Python\Pytho
+n312\Lib\site-packages\panpho
+n\featuretable.py", line 84, 
+in _read_bases
+    df = pd.read_csv(f)  
+         ^^^^^^^^^^^^^^
+  File "C:\Users\ADMIN\AppDat
+a\Local\Programs\Python\Pytho
+n312\Lib\site-packages\pandas
+\io\parsers\readers.py", 
+line 1026, in read_csv
+    return 
+_read(filepath_or_buffer, 
+kwds)
+           ^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^
+  File "C:\Users\ADMIN\AppDat
+a\Local\Programs\Python\Pytho
+n312\Lib\site-packages\pandas
+\io\parsers\readers.py", 
+line 620, in _read
+    parser = TextFileReader(f
+ilepath_or_buffer, **kwds)
+             ^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ADMIN\AppDat
+a\Local\Programs\Python\Pytho
+n312\Lib\site-packages\pandas
+\io\parsers\readers.py", 
+line 1620, in __init__
+    self._engine = 
+self._make_engine(f, 
+self.engine)
+                   ^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ADMIN\AppDat
+a\Local\Programs\Python\Pytho
+n312\Lib\site-packages\pandas
+\io\parsers\readers.py", 
+line 1898, in _make_engine
+    return 
+mapping[engine](f, 
+**self.options)
+           ^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^
+  File "C:\Users\ADMIN\AppDat
+a\Local\Programs\Python\Pytho
+n312\Lib\site-packages\pandas
+\io\parsers\c_parser_wrapper.
+py", line 93, in __init__
+    self._reader = 
+parsers.TextReader(src, 
+**kwds)
+                   ^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
+  File "parsers.pyx", line 
+574, in pandas._libs.parsers.
+TextReader.__cinit__
+  File "parsers.pyx", line 
+663, in pandas._libs.parsers.
+TextReader._get_header
+  File "parsers.pyx", line 
+874, in pandas._libs.parsers.
+TextReader._tokenize_rows
+  File "parsers.pyx", line 
+891, in pandas._libs.parsers.
+TextReader._check_tokenize_st
+atus
+  File "parsers.pyx", line 
+2053, in pandas._libs.parsers
+.raise_parser_error
+  File "C:\Users\ADMIN\AppDat
+a\Local\Programs\Python\Pytho
+n312\Lib\encodings\cp1252.py"
+, line 23, in decode
+    return codecs.charmap_dec
+ode(input,self.errors,decodin
+g_table)[0]
+           ^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^
+UnicodeDecodeError: 
+'charmap' codec can't decode 
+byte 0x90 in position 970: 
+character maps to <undefined>

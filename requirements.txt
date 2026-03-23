@@ -9,3 +9,8 @@ deep-translator
 eng-to-ipa
 pykakasi
 pypinyin
+epitran
+viphoneme
+vinorm
+underthesea
+
